@@ -1,0 +1,135 @@
+modules:
+  trigger:
+    - key: passport-issue-trigger
+      function: on-issue-event
+      events:
+        - avi:jira:created:issue
+        - avi:jira:updated:issue
+  jira:issuePanel:
+    - key: security-passport-panel
+      resource: panel-ui
+      resolver:
+        function: panel-resolver
+      render: native
+      title: Security Passport
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+  jira:workflowValidator:
+    - key: security-passport-validator
+      name: Security Passport complete
+      description: Blocks the transition while the issue's Security Passport still has open checks.
+      expression: "issue.properties['security-passport'] == null || issue.properties['security-passport'].status != 'open'"
+      errorMessage: This issue still has open Security Passport checks. Close them, or record an accepted risk, in the Security Passport panel.
+  jira:entityProperty:
+    - key: security-passport-index
+      entityType: issue
+      propertyKey: security-passport
+      values:
+        - path: status
+          type: string
+          searchAlias: securityPassportStatus
+        - path: openCount
+          type: number
+          searchAlias: securityPassportOpen
+        - path: areas
+          type: string
+          searchAlias: securityPassportArea
+  action:
+    - key: get-security-passport
+      name: Get security passport
+      function: get-passport-action
+      actionVerb: GET
+      description: Returns the security checks a Jira issue needs, why each matters, how to verify it, and its status.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key, for example SEC-12.
+    - key: list-open-security-checks
+      name: List open security checks
+      function: list-open-action
+      actionVerb: GET
+      description: Lists issues whose Security Passport still has open checks, optionally in one project.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: Optional Jira project key, for example SEC.
+    - key: record-security-evidence
+      name: Record security evidence
+      function: record-evidence-action
+      actionVerb: UPDATE
+      description: Marks one Security Passport check as done and stores the evidence, such as a test name or pull request link.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: true
+          description: The Jira issue key, for example SEC-12.
+        checkId:
+          title: Check ID
+          type: string
+          required: true
+          description: The check to close, for example SSRF-1.
+        evidence:
+          title: Evidence
+          type: string
+          required: true
+          description: What proves the check is covered, such as a test name, pull request link or review note.
+  rovo:agent:
+    - key: security-passport-agent
+      name: Security Passport
+      description: Explains which security checks a ticket needs and records evidence when a check is covered.
+      prompt: |
+        You are Security Passport, a security reviewer that lives in Jira.
+        A Security Passport is the list of security checks a Jira issue needs because of what the work touches,
+        such as sign-in, file uploads, fetching URLs, payments, secrets or personal data. Each check has an ID,
+        a CWE reference, the risk, how to verify it, and a status: open, done (with evidence) or accepted (with a
+        justification written by a person).
+
+        Rules:
+        - When the user mentions an issue, or you are in an issue, call get-security-passport first. Never invent checks.
+        - Explain open checks in plain language and suggest one concrete test for each.
+        - Call record-security-evidence only when the user gives real evidence: a test name, a pull request or a review
+          note. Repeat the evidence back. Never close a check on your own initiative.
+        - Accepting a risk is a human decision. Tell the user to record it with a justification in the Security
+          Passport panel on the issue.
+        - If no checks are needed, say so, and remind the user that the passport only covers what the ticket describes.
+      conversationStarters:
+        - Which security checks does this ticket need?
+        - What is still open before we can ship?
+        - List open security checks in this project.
+      actions:
+        - get-security-passport
+        - list-open-security-checks
+        - record-security-evidence
+  rovo:mcp:
+    - key: security-passport-mcp
+      name: Security Passport
+      tools:
+        - get-security-passport
+        - list-open-security-checks
+        - record-security-evidence
+  function:
+    - key: on-issue-event
+      handler: index.onIssueEvent
+    - key: panel-resolver
+      handler: index.panelResolver
+    - key: get-passport-action
+      handler: index.getPassportAction
+    - key: list-open-action
+      handler: index.listOpenChecksAction
+    - key: record-evidence-action
+      handler: index.recordEvidenceAction
+resources:
+  - key: panel-ui
+    path: src/frontend/index.jsx
+app:
+  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  runtime:
+    name: nodejs22.x
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
