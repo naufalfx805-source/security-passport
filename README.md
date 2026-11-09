@@ -64,7 +64,9 @@ The same three tools are served by the Atlassian MCP server at:
    then run `/mcp` and choose **Authenticate**. The Atlassian consent screen asks which site to use.
 3. Ask the agent "What security checks does SEC-1 need?", or give it the [skill](skills/security-passport/SKILL.md) so it fetches the passport before it writes code and records evidence when a check is covered.
 
-The tools run as the signed-in user, so Jira permissions still decide what they can read and change.
+The tools run as the signed-in user, so Jira permissions still decide what they can read and change. Their names carry the app environment as a suffix, for example `get-security-passport_development` on a development install.
+
+For a scripted check without an AI client, `node scripts/mcp-smoke.mjs SEC-1` signs in through the browser, lists the tools and reads the passport of SEC-1 (add `--record CHECK-ID "evidence"` to test the write tool). Tokens stay in memory and are revoked at the end.
 
 ## License
 

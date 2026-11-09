@@ -19,7 +19,7 @@ The app exposes three tools through the Atlassian MCP server (Forge `rovo:mcp` m
 | `list-open-security-checks` | Lists issues whose passport still has open checks, optionally for one project. |
 | `record-security-evidence` | Marks one check as done and stores the evidence. |
 
-Connect your agent to `https://mcp.atlassian.com/forge/73ed7a14-59de-41d1-8c1a-16b679c5860e` (remote MCP over streamable HTTP, OAuth sign-in), on a site where Security Passport is installed and a site admin has enabled its tools for MCP-compatible apps. The tools run with your own Jira permissions.
+Connect your agent to `https://mcp.atlassian.com/forge/73ed7a14-59de-41d1-8c1a-16b679c5860e` (remote MCP over streamable HTTP, OAuth sign-in), on a site where Security Passport is installed and a site admin has enabled its tools for MCP-compatible apps. The tools run with your own Jira permissions. Your client may show them with an environment suffix, such as `get-security-passport_development`; they are the same tools.
 
 ## Workflow
 
