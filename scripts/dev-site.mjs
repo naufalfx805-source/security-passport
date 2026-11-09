@@ -9,7 +9,8 @@
 //   create-project KEY "Name"     company-managed Kanban project (workflow validators need one)
 //   create-issues KEY             the demo tickets used in the video
 //   create-issue KEY "Summary" ["Description"]  one ticket (checks the created trigger)
-//   touch KEY...                  add a label so the updated trigger fires
+//   touch KEY...                  toggle a label so the updated trigger fires
+//   reset KEY...                  delete stored passports (demo preparation)
 //   done KEY                      try to move an issue to Done
 //   passport ISSUE-KEY            the stored Security Passport of one issue
 //   search-open [KEY]             JQL: issues whose passport is open
@@ -118,6 +119,19 @@ const commands = {
     }
   },
 
+  // Delete stored passports (demo preparation only); the next event or panel view rebuilds them.
+  async reset(...keys) {
+    for (const key of keys) {
+      try {
+        await jira(`/rest/api/3/issue/${key}/properties/security-passport`, { method: 'DELETE' });
+        console.log(`reset ${key}`);
+      } catch (error) {
+        if (!/-> 404/.test(error.message)) throw error;
+        console.log(`${key}: no passport to reset`);
+      }
+    }
+  },
+
   // Try to move an issue to Done; the Security Passport validator may refuse.
   async done(issueKey) {
     const { transitions } = await jira(`/rest/api/3/issue/${issueKey}/transitions`);
@@ -143,7 +157,7 @@ const commands = {
       throw error;
     }
     const p = property.value;
-    console.log(`${issueKey}: ${p.status} (${p.doneCount}/${p.total} closed), areas: ${p.areas.join(', ') || 'none'}`);
+    console.log(`${issueKey}: ${p.status} (${p.doneCount}/${p.total} closed, rules v${p.rulesVersion ?? 1}), areas: ${p.areas.join(', ') || 'none'}`);
     for (const area of p.detected) console.log(`  area ${area.id}: ${area.matches.join(', ')}`);
     for (const c of p.checks) {
       const who = c.by ? `, by ${c.by} at ${c.at}` : '';
