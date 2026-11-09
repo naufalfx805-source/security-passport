@@ -4,9 +4,13 @@
 // Usage:
 //   node --env-file=$HOME/.forge-env scripts/dev-site.mjs <site> <command> [args]
 // Commands:
+//   projects                      list the projects on the site
 //   myself                        who the token belongs to
 //   create-project KEY "Name"     company-managed Kanban project (workflow validators need one)
 //   create-issues KEY             the demo tickets used in the video
+//   create-issue KEY "Summary" ["Description"]  one ticket (checks the created trigger)
+//   touch KEY...                  add a label so the updated trigger fires
+//   done KEY                      try to move an issue to Done
 //   passport ISSUE-KEY            the stored Security Passport of one issue
 //   search-open [KEY]             JQL: issues whose passport is open
 
@@ -90,14 +94,27 @@ const commands = {
     }
   },
 
-  // Add a "demo" label so Jira fires avi:jira:updated:issue for each key.
+  // One new ticket, to check that avi:jira:created:issue builds a passport.
+  async 'create-issue'(key, summary, description = '') {
+    const meta = await jira(`/rest/api/3/project/${key}`);
+    const type = (meta.issueTypes || []).find((t) => t.name === 'Task') || (meta.issueTypes || []).find((t) => !t.subtask);
+    const fields = { project: { key }, issuetype: { id: type.id }, summary };
+    if (description) fields.description = adf(description);
+    const issue = await jira('/rest/api/3/issue', { method: 'POST', body: JSON.stringify({ fields }) });
+    console.log(`${issue.key}  ${summary}`);
+  },
+
+  // Toggle a "demo" label so Jira fires avi:jira:updated:issue for each key.
+  // Adding a label the issue already has changes nothing, and Jira sends no event.
   async touch(...keys) {
     for (const key of keys) {
+      const issue = await jira(`/rest/api/3/issue/${key}?fields=labels`);
+      const op = (issue.fields.labels || []).includes('demo') ? 'remove' : 'add';
       await jira(`/rest/api/3/issue/${key}`, {
         method: 'PUT',
-        body: JSON.stringify({ update: { labels: [{ add: 'demo' }] } }),
+        body: JSON.stringify({ update: { labels: [{ [op]: 'demo' }] } }),
       });
-      console.log(`touched ${key}`);
+      console.log(`touched ${key} (${op} label demo)`);
     }
   },
 

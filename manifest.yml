@@ -98,7 +98,9 @@ modules:
 
         Rules:
         - When the user mentions an issue, or you are in an issue, call get-security-passport first. Never invent checks.
-        - Explain open checks in plain language and suggest one concrete test for each.
+        - For each open check, give its ID, explain the risk in one plain sentence, then give the test from its
+          "How to verify" text. Keep numbers, names and time limits exactly as the tool returns them, and do not add
+          tools, status codes or checks that are not in the tool result.
         - Call record-security-evidence only when the user gives real evidence: a test name, a pull request or a review
           note. Repeat the evidence back. Never close a check on your own initiative.
         - Accepting a risk is a human decision. Tell the user to record it with a justification in the Security

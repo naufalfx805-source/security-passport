@@ -48,7 +48,23 @@ Then, in a company-managed project's workflow, add the validator "Security Passp
 2. Create an issue with the summary "Add a webhook that fetches the customer's logo from a URL". Open the issue: the Security Passport panel lists the SSRF checks and the words that triggered them.
 3. Mark SSRF-1 as done with evidence such as `test_rejects_private_addresses`, or accept a risk with a justification.
 4. Optional: add the "Security Passport complete" validator to the Done transition and try to close the issue while checks are open.
-5. Optional: in Rovo, ask the Security Passport agent "Which security checks does SEC-1 need?".
+5. Optional: in Rovo, ask the Security Passport agent "Which security checks does SEC-1 need?". To record evidence, tell it which check is covered and how ("SSRF-1 is covered by test_rejects_private_addresses in PR #42"). Rovo asks you to confirm before anything is written.
+
+## Connect an MCP client (Atlassian MCP, Preview)
+
+The same three tools are served by the Atlassian MCP server at:
+
+    https://mcp.atlassian.com/forge/73ed7a14-59de-41d1-8c1a-16b679c5860e
+
+1. A site admin turns them on once per site: [admin.atlassian.com](https://admin.atlassian.com) → your organization → **Apps** → **Atlassian apps** → "Looking for your Marketplace and third-party apps?" (the site's **Connected apps**) → **Security Passport** → **View app details** → **Tools: Expose tools to MCP-compatible apps** → **Enable tools**.
+2. Add the URL to your MCP client as a remote (streamable HTTP) server. With Claude Code:
+
+       claude mcp add --transport http security-passport https://mcp.atlassian.com/forge/73ed7a14-59de-41d1-8c1a-16b679c5860e
+
+   then run `/mcp` and choose **Authenticate**. The Atlassian consent screen asks which site to use.
+3. Ask the agent "What security checks does SEC-1 need?", or give it the [skill](skills/security-passport/SKILL.md) so it fetches the passport before it writes code and records evidence when a check is covered.
+
+The tools run as the signed-in user, so Jira permissions still decide what they can read and change.
 
 ## License
 
