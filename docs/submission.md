@@ -8,6 +8,10 @@
 
 **Bonus prizes:** Best app with Atlassian MCP (primary). Also eligible for Best Agents (rovo:agent with three actions).
 
+**Installation link (production, Jira):** https://developer.atlassian.com/console/install/73ed7a14-59de-41d1-8c1a-16b679c5860e?signature=AYABeOvNIg84QO1CLoYjaAMegCwAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucBPXTm0cFT90jHC31R9mDuJgAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDPRr10DROkwrgKnABwIBEIA7vihvnErePSJIGsCGzix2Xasr0nkqE8AU5yjDxlNR3kSsTK2OE081WjeJQuK86r%2BOcc6OwLm8MnGuDQgAB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgFDF3nJ21UDLjpaj0k5wfXBAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQM6iIEvy0tvK9zOCM%2BAgEQgDutOMOd2Ruo2ilhLS%2BTfgc1JHg0wt10lY2Pntd4lo8wATzk4nyY7yLRoBhnJwCy3LNlMnNAuhp57OO27AAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEAX%2FLBasr%2FJW52aBN3QEmnx4AAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAzPtHXv80ZToMAZ%2FwoCARCAO9%2FMI53F3wJRVdZ2VFceuOySpE9u2Gwh1kFQZ3i1At4PyQvJP3ysbn1u0c38KXcO2zL54uWrvog1tgTQAgAAAAAMAAAQAAAAAAAAAAAAAAAAAHCTHbtvuntZNjRbXhzCM0T%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLEaivmJHaeVxFnJkPD%2Ba4NKhOZ63vnDJfAhpwExLodz%2BpagYH4SghyDDhVS32cn%2B3VCoqUMy238bWGpHInycCmufc%3D&product=jira
+
+**Privacy policy and terms:** https://gist.github.com/naufalfx805-source/5116e3946a16a05fd0cb678cfdfba303
+
 ## About the project
 
 ### Inspiration
@@ -38,4 +42,4 @@ A Bitbucket merge check that reads the linked ticket's passport, team-specific r
 The app declares a `rovo:mcp` module exposing `get-security-passport`, `list-open-security-checks` and `record-security-evidence`. The repository ships `skills/security-passport/SKILL.md`, an open-source skill for third-party agents such as Claude Code. It describes when to call each tool, what counts as evidence, and why the agent must never accept a risk itself. The demo video shows a coding agent fetching the passport, writing the SSRF test and recording the evidence back on the Jira issue.
 
 ## Testing instructions for judges
-See "Try it (for judges)" in README.md. After installing from the link, create an issue with the summary "Add a webhook that fetches the customer's logo from a URL" and open the Security Passport panel. The workflow validator is optional and is added in the workflow editor (transition into Done, "Security Passport complete").
+See "Try it (for judges)" in README.md. After installing from the link, create an issue with the summary "Add a webhook that fetches the customer's logo from a URL" and open the Security Passport panel (if it is not shown yet, use the issue's "View app actions" menu, then Security Passport). The workflow validator is optional and is added in the workflow editor (transition into Done, "Security Passport complete").
