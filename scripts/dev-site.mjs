@@ -51,6 +51,12 @@ const DEMO_ISSUES = [
 ];
 
 const commands = {
+  async projects() {
+    const page = await jira('/rest/api/3/project/search?maxResults=50');
+    for (const p of page.values || []) console.log(`${p.key}  ${p.name}  (${p.style || p.projectTypeKey})`);
+    console.log(`(${(page.values || []).length} projects)`);
+  },
+
   async myself() {
     const me = await jira('/rest/api/3/myself');
     console.log(`${me.displayName} ${me.accountId}`);
@@ -122,7 +128,10 @@ const commands = {
     const p = property.value;
     console.log(`${issueKey}: ${p.status} (${p.doneCount}/${p.total} closed), areas: ${p.areas.join(', ') || 'none'}`);
     for (const area of p.detected) console.log(`  area ${area.id}: ${area.matches.join(', ')}`);
-    for (const c of p.checks) console.log(`  ${c.id} ${c.status}${c.note ? ` (${c.note})` : ''}`);
+    for (const c of p.checks) {
+      const who = c.by ? `, by ${c.by} at ${c.at}` : '';
+      console.log(`  ${c.id} ${c.status}${c.note ? ` (${c.note}${who})` : ''}${c.stale ? ' [stale]' : ''}`);
+    }
   },
 
   async 'search-open'(projectKey) {

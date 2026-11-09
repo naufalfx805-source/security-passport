@@ -17,45 +17,45 @@ test('a ticket with no risky wording needs no checks', () => {
 });
 
 test('a risky ticket gets open checks', () => {
-  const p = build('Add webhook support');
+  const p = build('Send webhooks to the customer URL');
   assert.equal(p.status, 'open');
   assert.ok(p.checks.some((c) => c.id === 'SSRF-1' && c.status === 'open'));
   assert.equal(p.openCount, p.total);
 });
 
 test('re-running the analysis keeps statuses and does not touch updatedAt', () => {
-  let p = build('Add webhook support');
+  let p = build('Send webhooks to the customer URL');
   p = setCheckStatus(p, 'SSRF-1', { status: 'done', note: 'test_rejects_private_ips', by: 'acc-1', now: T0 });
-  const again = mergePassport(p, analyzeIssue({ summary: 'Add webhook support' }), { now: T1 });
+  const again = mergePassport(p, analyzeIssue({ summary: 'Send webhooks to the customer URL' }), { now: T1 });
   assert.equal(again.checks.find((c) => c.id === 'SSRF-1').status, 'done');
   assert.equal(again.updatedAt, p.updatedAt);
   assert.ok(samePassport(p, again));
 });
 
 test('new wording adds checks without dropping old ones', () => {
-  const first = build('Add webhook support');
-  const second = mergePassport(first, analyzeIssue({ summary: 'Add webhook support and let users upload a CSV' }), { now: T1 });
+  const first = build('Send webhooks to the customer URL');
+  const second = mergePassport(first, analyzeIssue({ summary: 'Send webhooks to the customer URL and let users upload a CSV' }), { now: T1 });
   assert.ok(second.checks.some((c) => c.area === 'upload'));
   assert.ok(second.checks.some((c) => c.area === 'ssrf'));
   assert.equal(second.updatedAt, T1);
 });
 
 test('removing the wording does not clear the gate', () => {
-  const first = build('Add webhook support');
+  const first = build('Send webhooks to the customer URL');
   const edited = mergePassport(first, analyzeIssue({ summary: 'Small refactor' }), { now: T1 });
   assert.equal(edited.status, 'open');
   assert.ok(edited.checks.every((c) => c.stale === true));
 });
 
 test('done needs evidence and accepted needs a justification', () => {
-  const p = build('Add webhook support');
+  const p = build('Send webhooks to the customer URL');
   assert.throws(() => setCheckStatus(p, 'SSRF-1', { status: 'done', note: '' }), /evidence/);
   assert.throws(() => setCheckStatus(p, 'SSRF-1', { status: 'accepted', note: 'fine' }), /at least 20/);
   assert.throws(() => setCheckStatus(p, 'NOPE-1', { status: 'done', note: 'some evidence' }), /not part/);
 });
 
 test('closing every check completes the passport, and reopening reopens it', () => {
-  let p = build('Add webhook support');
+  let p = build('Send webhooks to the customer URL');
   for (const c of p.checks) {
     p = setCheckStatus(p, c.id, { status: c.id === 'SSRF-3' ? 'accepted' : 'done', note: 'covered by the internal-only network policy test', by: 'acc-1', now: T1 });
   }
@@ -67,7 +67,7 @@ test('closing every check completes the passport, and reopening reopens it', () 
 });
 
 test('text view lists checks with CWE and evidence', () => {
-  let p = build('Add webhook support');
+  let p = build('Send webhooks to the customer URL');
   p = setCheckStatus(p, 'SSRF-1', { status: 'done', note: 'PR #42', by: 'acc-1', now: T1 });
   const text = passportToText('SEC-12', p);
   assert.match(text, /SEC-12: Security Passport is OPEN/);

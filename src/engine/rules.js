@@ -1,8 +1,12 @@
 // Rule catalog: which ticket wording signals which security area, and the
 // checks that area needs. Deterministic on purpose, so every check can be
 // explained by the words that triggered it.
+//
+// A check may carry `when`: a pattern the ticket text must also match for that
+// check to apply (for example, password hashing only when passwords are
+// mentioned). Checks without `when` always apply to their area.
 
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 
 export const RULES = [
   {
@@ -35,7 +39,10 @@ export const RULES = [
     id: 'ssrf',
     label: 'Server-side requests to URLs (SSRF)',
     patterns: [
-      /\bwebhooks?\b/, /\bcallback url\b/, /\bfetch(es|ing)? (a |the )?(remote |external )?(url|link|image|page|feed|file)s?\b/,
+      // Outgoing webhooks only: the server calls a URL someone else chose.
+      /\b(outgoing|send|sends|sending|fire|fires|firing|call|calls|calling|deliver|delivers|delivering)\b[^.\n]{0,30}\bwebhooks?\b/,
+      /\bwebhooks? (url|target)s?\b/, /\bwebhooks? (that|to) (call|fetch|post|notify|ping)/,
+      /\bcallback url\b/, /\bfetch(es|ing)? (a |the )?(remote |external )?(url|link|image|page|feed|file)s?\b/,
       /\bfrom (a |the )?url\b/, /\bimport (from )?(a )?url\b/, /\blink previews?\b/, /\bunfurl/, /\bproxy\b/,
       /\bremote (image|file|url|resource)s?\b/, /\bdownload (it )?from\b/, /\$ref\b/, /\brss\b/,
     ],
@@ -109,21 +116,36 @@ export const RULES = [
     ],
     checks: [
       { id: 'PAY-1', cwe: 'CWE-602', title: 'Compute amounts, prices and discounts on the server; never trust an amount sent by the client.', verify: 'Test: changing the amount or quantity in the request does not change the charged total.' },
-      { id: 'PAY-2', cwe: 'CWE-345', title: 'Verify payment-provider webhook signatures and make the handlers idempotent.', verify: 'Test: an unsigned or replayed webhook is rejected, and delivering the same event twice changes state once.' },
-      { id: 'PAY-3', cwe: 'CWE-362', title: 'Prevent double spending with locks or idempotency keys on balance, coupon and refund changes.', verify: 'Test: two concurrent requests that redeem the same coupon succeed only once.' },
+      { id: 'PAY-2', cwe: 'CWE-345', when: /\b(webhooks?|callbacks?|notifications?|events?)\b/, title: 'Verify payment-provider webhook signatures and make the handlers idempotent.', verify: 'Test: an unsigned or replayed webhook is rejected, and delivering the same event twice changes state once.' },
+      { id: 'PAY-3', cwe: 'CWE-362', when: /\b(balances?|wallets?|coupons?|vouchers?|refunds?|credits?|points|discount codes?|promo codes?|redeem|top[- ]?up)\b/, title: 'Prevent double spending with locks or idempotency keys on balance, coupon and refund changes.', verify: 'Test: two concurrent requests that redeem the same coupon succeed only once.' },
+    ],
+  },
+  {
+    id: 'webhook-in',
+    label: 'Incoming webhooks',
+    patterns: [
+      /\b(incoming|inbound|receive|receives|receiving|handle|handles|handler for)\b[^.\n]{0,30}\bwebhooks?\b/,
+      /\bwebhooks?\b[^.\n]{0,40}\b(signature|signed|verify|verifies|verification)\b/,
+      /\b(signature|verify|verifies)\b[^.\n]{0,40}\bwebhooks?\b/,
+    ],
+    checks: [
+      { id: 'HOOK-1', cwe: 'CWE-345', title: "Verify the sender's signature over the raw request body, with a constant-time compare, before parsing it.", verify: 'Test: a request with a missing or wrong signature, or a changed body, is rejected with 401 and has no side effects.' },
+      { id: 'HOOK-2', cwe: 'CWE-294', title: 'Reject replays: check the signed timestamp window and remember processed event IDs.', verify: 'Test: replaying a valid delivery after 5 minutes, or a second time, is rejected.' },
+      { id: 'HOOK-3', cwe: 'CWE-20', title: "Treat the payload as a hint: re-read authoritative state from the provider's API before acting on amounts or statuses.", verify: 'Test: a correctly signed event carrying a different amount does not change the stored amount.' },
     ],
   },
   {
     id: 'crypto',
     label: 'Cryptography and tokens',
     patterns: [
-      /\bencrypt(ion|ed|s)?\b/, /\bdecrypt(ion|ed|s)?\b/, /\bhash(es|ing)?\b/, /\bsignatures?\b/, /\bhmac\b/,
-      /\brandom (tokens?|codes?|ids?)\b/, /\botp\b/, /\b(certificates?|tls|ssl)\b/, /\b(bcrypt|argon2|pbkdf2|sha-?1|md5)\b/,
+      /\bencrypt(ion|ed|s)?\b/, /\bdecrypt(ion|ed|s)?\b/, /\bhash(es|ing)?\b/, /\b(digital|cryptographic) signatures?\b/,
+      /\bsign(s|ing)? (the )?(payload|request|url|token|jwt)s?\b/, /\bhmac\b/,
+      /\brandom (tokens?|codes?|ids?)\b/, /\botp\b/, /\b(certificates?|tls|ssl)\b/, /\b(bcrypt|argon2|scrypt|pbkdf2|sha-?1|md5)\b/,
     ],
     checks: [
-      { id: 'CRYPTO-1', cwe: 'CWE-327', title: 'Use vetted library primitives (AES-GCM or libsodium) with keys from the key store; no custom crypto or fixed IVs.', verify: 'Code review: no ECB, MD5 or SHA-1 used for security, and no keys in the repository.' },
-      { id: 'CRYPTO-2', cwe: 'CWE-916', title: 'Hash passwords with Argon2id, scrypt or bcrypt and a per-user salt.', verify: 'Test: the stored hash uses the chosen algorithm and work factor.' },
-      { id: 'CRYPTO-3', cwe: 'CWE-330', title: 'Generate tokens, codes and IDs with a CSPRNG and compare secrets in constant time.', verify: 'Code review: no Math.random() for security values, and comparisons use a timing-safe function.' },
+      { id: 'CRYPTO-1', cwe: 'CWE-327', when: /\b(encrypt|decrypt|digital signatures?|cryptographic|sign(s|ing)?|hmac|certificates?|tls|ssl|sha-?1|md5|keys?)\b/, title: 'Use vetted library primitives (AES-GCM or libsodium) with keys from the key store; no custom crypto or fixed IVs.', verify: 'Code review: no ECB, MD5 or SHA-1 used for security, and no keys in the repository.' },
+      { id: 'CRYPTO-2', cwe: 'CWE-916', when: /\b(passwords?|passphrases?|bcrypt|argon2|scrypt|pbkdf2)\b/, title: 'Hash passwords with Argon2id, scrypt or bcrypt and a per-user salt.', verify: 'Test: the stored hash uses the chosen algorithm and work factor.' },
+      { id: 'CRYPTO-3', cwe: 'CWE-330', when: /\b(random|tokens?|codes?|otp|ids?|nonces?|hmac|compare|comparison)\b/, title: 'Generate tokens, codes and IDs with a CSPRNG and compare secrets in constant time.', verify: 'Code review: no Math.random() for security values, and comparisons use a timing-safe function.' },
     ],
   },
   {

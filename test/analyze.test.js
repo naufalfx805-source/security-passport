@@ -8,7 +8,25 @@ test('a webhook that fetches a remote image is flagged as SSRF', () => {
   const result = analyzeIssue({ summary: 'Add webhook that fetches the remote image for link previews' });
   const ssrf = result.areas.find((a) => a.id === 'ssrf');
   assert.ok(ssrf, 'ssrf area detected');
-  assert.ok(ssrf.matches.includes('webhook'));
+  assert.ok(ssrf.matches.some((m) => m.includes('webhook')));
+});
+
+test('outgoing webhooks are SSRF, incoming webhooks are signature checks', () => {
+  assert.ok(ids({ summary: 'Send webhooks to the URL each customer configures' }).includes('ssrf'));
+  const incoming = ids({ summary: 'Handle incoming GitHub webhooks and verify the signature' });
+  assert.ok(incoming.includes('webhook-in'));
+  assert.ok(!incoming.includes('ssrf'), 'receiving a webhook is not SSRF');
+});
+
+test('crypto checks only appear when their context is in the ticket', () => {
+  const passwords = analyzeIssue({ summary: 'Hash passwords with bcrypt' }).areas.find((a) => a.id === 'crypto');
+  assert.deepEqual(passwords.checkIds, ['CRYPTO-2']);
+  assert.deepEqual(ids({ summary: 'Compute a hash of each uploaded file to find duplicates' }).filter((id) => id === 'crypto'), []);
+});
+
+test('payment checks follow the money flow in the ticket', () => {
+  const coupons = analyzeIssue({ summary: 'Let shoppers redeem coupon codes at checkout' }).areas.find((a) => a.id === 'payments');
+  assert.deepEqual(coupons.checkIds, ['PAY-1', 'PAY-3']);
 });
 
 test('avatar upload is flagged as upload', () => {
@@ -30,7 +48,8 @@ test('ADF descriptions are read', () => {
     content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Store the Stripe API key and verify the webhook signature.' }] }],
   };
   const found = ids({ summary: 'Billing integration', description });
-  for (const id of ['payments', 'secrets', 'ssrf', 'crypto']) assert.ok(found.includes(id), `${id} detected`);
+  for (const id of ['payments', 'secrets', 'webhook-in']) assert.ok(found.includes(id), `${id} detected`);
+  for (const id of ['ssrf', 'crypto']) assert.ok(!found.includes(id), `${id} not detected`);
 });
 
 test('a security-passport label adds an area the wording missed', () => {

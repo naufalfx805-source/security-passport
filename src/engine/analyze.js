@@ -20,7 +20,10 @@ export function analyzeIssue(fields = {}) {
         if (matches.size < MAX_MATCHES_PER_AREA) matches.add(hit.trim());
       }
     }
-    if (matches.size > 0) areas.push({ id: rule.id, label: rule.label, matches: [...matches] });
+    if (matches.size === 0) continue;
+    // Keep only the checks whose own context matches; drop the area if none apply.
+    const checkIds = rule.checks.filter((c) => !c.when || c.when.test(text)).map((c) => c.id);
+    if (checkIds.length > 0) areas.push({ id: rule.id, label: rule.label, matches: [...matches], checkIds });
   }
 
   // A label such as "security-passport:ssrf" adds an area the wording missed.
@@ -30,7 +33,8 @@ export function analyzeIssue(fields = {}) {
     const id = lower.slice(LABEL_PREFIX.length);
     const rule = RULES_BY_ID.get(id);
     if (rule && !areas.some((a) => a.id === id)) {
-      areas.push({ id, label: rule.label, matches: [`label ${label}`] });
+      // An explicit label asks for the whole area, so every check applies.
+      areas.push({ id, label: rule.label, matches: [`label ${label}`], checkIds: rule.checks.map((c) => c.id) });
     }
   }
   return { areas };

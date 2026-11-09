@@ -8,9 +8,14 @@ export const CHECK_STATUSES = ['open', 'done', 'accepted'];
 const MIN_EVIDENCE = 5;
 const MIN_JUSTIFICATION = 20;
 
-function checksForArea(areaId) {
+// The checks of one area, limited to `checkIds` when the analysis narrowed them.
+// The `when` pattern is rule logic, not data, so it is not stored.
+function checksForArea(areaId, checkIds) {
   const rule = RULES_BY_ID.get(areaId);
-  return (rule?.checks || []).map((check) => ({ ...check, area: areaId }));
+  const allowed = checkIds ? new Set(checkIds) : null;
+  return (rule?.checks || [])
+    .filter((check) => !allowed || allowed.has(check.id))
+    .map(({ when, ...check }) => ({ ...check, area: areaId }));
 }
 
 function summarize(checks) {
@@ -29,7 +34,7 @@ export function mergePassport(existing, analysis, { now = new Date().toISOString
   const checks = [];
 
   for (const area of analysis.areas) {
-    for (const check of checksForArea(area.id)) {
+    for (const check of checksForArea(area.id, area.checkIds)) {
       const prev = previous.get(check.id);
       checks.push(prev
         ? { ...check, status: prev.status, note: prev.note ?? null, by: prev.by ?? null, at: prev.at ?? null }
