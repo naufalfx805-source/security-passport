@@ -68,6 +68,10 @@ The tools run as the signed-in user, so Jira permissions still decide what they 
 
 For a scripted check without an AI client, `node scripts/mcp-smoke.mjs SEC-1` signs in through the browser, lists the tools and reads the passport of SEC-1 (add `--record CHECK-ID "evidence"` to test the write tool). Tokens stay in memory and are revoked at the end.
 
+## Privacy and terms
+
+The app keeps everything in your Jira site: see the [privacy policy](PRIVACY.md) and [terms of service](TERMS.md), also published at https://gist.github.com/naufalfx805-source/5116e3946a16a05fd0cb678cfdfba303 for the installation page.
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
