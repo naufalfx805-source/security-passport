@@ -1,0 +1,198 @@
+// MCP smoke test for Security Passport through the Atlassian MCP server.
+// Signs in with OAuth 2.1 (dynamic client registration + PKCE, callback on localhost),
+// lists the app's tools, reads a passport, lists open checks and can record evidence.
+// Tokens stay in memory, are never printed, and are revoked at the end.
+//
+// Usage:
+//   node scripts/mcp-smoke.mjs <ISSUE-KEY> [--project KEY] [--record CHECK-ID "evidence"] [--port 33418]
+// Before it can work, a site admin must enable the app's tools for MCP-compatible apps
+// (see "Connect an MCP client" in the README).
+
+import crypto from 'node:crypto';
+import http from 'node:http';
+
+const APP_ID = '73ed7a14-59de-41d1-8c1a-16b679c5860e';
+const SERVER = `https://mcp.atlassian.com/forge/${APP_ID}`;
+const SCOPES = process.env.MCP_SCOPES || 'read:me read:account read:jira-work write:jira-work';
+const WAIT_MS = 45 * 60 * 1000;
+
+const args = process.argv.slice(2);
+const flag = (name) => {
+  const i = args.indexOf(name);
+  return i === -1 ? null : args.slice(i + 1, i + 3);
+};
+const issueKey = args[0] && !args[0].startsWith('--') ? args[0].toUpperCase() : 'SEC-1';
+const projectKey = (flag('--project')?.[0] || issueKey.split('-')[0]).toUpperCase();
+const record = flag('--record');
+const port = Number(flag('--port')?.[0] || 33418);
+const redirectUri = `http://localhost:${port}/callback`;
+
+const b64url = (buf) => Buffer.from(buf).toString('base64url');
+const log = (...parts) => console.log(...parts);
+
+async function getJson(url, init) {
+  const res = await fetch(url, init);
+  const text = await res.text();
+  let body = text;
+  try { body = JSON.parse(text); } catch { /* not JSON */ }
+  if (!res.ok) throw new Error(`${init?.method || 'GET'} ${url} -> ${res.status}: ${String(text).slice(0, 300)}`);
+  return body;
+}
+
+// 1. Discovery: the server's 401 names its protected-resource metadata.
+async function discover() {
+  const probe = await fetch(SERVER, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'ping' }),
+  });
+  const header = probe.headers.get('www-authenticate') || '';
+  const metadataUrl = /resource_metadata="([^"]+)"/.exec(header)?.[1];
+  if (!metadataUrl) throw new Error(`No resource_metadata in WWW-Authenticate (status ${probe.status}).`);
+  const resource = await getJson(metadataUrl);
+  const issuer = resource.authorization_servers[0];
+  const u = new URL(issuer);
+  const asMeta = await getJson(`${u.origin}/.well-known/oauth-authorization-server${u.pathname}`);
+  return { resource: resource.resource, as: asMeta };
+}
+
+// 2. Dynamic client registration as a public client.
+async function register(as) {
+  const client = await getJson(as.registration_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_name: 'Security Passport MCP smoke test',
+      redirect_uris: [redirectUri],
+      grant_types: ['authorization_code'],
+      response_types: ['code'],
+      token_endpoint_auth_method: 'none',
+    }),
+  });
+  return client.client_id;
+}
+
+// 3. Wait for the browser to come back to the localhost callback.
+function waitForCode(expectedState) {
+  return new Promise((resolve, reject) => {
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url, `http://localhost:${port}`);
+      if (url.pathname === '/health') { res.end('ok'); return; }
+      if (url.pathname !== '/callback') { res.statusCode = 404; res.end(); return; }
+      const error = url.searchParams.get('error');
+      const code = url.searchParams.get('code');
+      const ok = !error && code && url.searchParams.get('state') === expectedState;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.end(ok ? 'Signed in. You can close this tab and go back to the terminal.' : `Sign-in failed: ${error || 'bad state'}`);
+      server.close();
+      clearTimeout(timer);
+      if (ok) resolve(code); else reject(new Error(`Sign-in failed: ${error || 'state mismatch'} ${url.searchParams.get('error_description') || ''}`));
+    });
+    const timer = setTimeout(() => { server.close(); reject(new Error('Timed out waiting for sign-in.')); }, WAIT_MS);
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+async function exchange(as, clientId, code, verifier, resource) {
+  const form = new URLSearchParams({
+    grant_type: 'authorization_code', client_id: clientId, code, redirect_uri: redirectUri, code_verifier: verifier, resource,
+  });
+  const token = await getJson(as.token_endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+    body: form,
+  });
+  return token.access_token;
+}
+
+// 4. MCP over streamable HTTP. Responses are JSON or a short event stream.
+function mcpClient(accessToken) {
+  let sessionId = null;
+  let nextId = 1;
+  async function send(message) {
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      'MCP-Protocol-Version': '2025-06-18',
+    };
+    if (sessionId) headers['Mcp-Session-Id'] = sessionId;
+    const res = await fetch(SERVER, { method: 'POST', headers, body: JSON.stringify(message) });
+    sessionId = res.headers.get('mcp-session-id') || sessionId;
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${message.method} -> ${res.status}: ${text.slice(0, 300)}`);
+    if (message.id === undefined) return null;
+    const payloads = (res.headers.get('content-type') || '').includes('text/event-stream')
+      ? text.split('\n').filter((l) => l.startsWith('data:')).map((l) => JSON.parse(l.slice(5)))
+      : [JSON.parse(text)];
+    const reply = payloads.find((p) => p.id === message.id);
+    if (!reply) throw new Error(`${message.method}: no reply`);
+    if (reply.error) throw new Error(`${message.method}: ${JSON.stringify(reply.error)}`);
+    return reply.result;
+  }
+  return {
+    request: (method, params) => send({ jsonrpc: '2.0', id: nextId++, method, params }),
+    notify: (method, params) => send({ jsonrpc: '2.0', method, params }),
+  };
+}
+
+const textOf = (result) => (result?.content || []).map((c) => c.text || JSON.stringify(c)).join('\n');
+
+async function main() {
+  const { resource, as } = await discover();
+  log(`MCP server: ${SERVER}`);
+  log(`Authorization server: ${as.issuer}`);
+  const clientId = await register(as);
+  log('Registered a temporary OAuth client.');
+
+  const verifier = b64url(crypto.randomBytes(32));
+  const state = b64url(crypto.randomBytes(16));
+  const authorize = new URL(as.authorization_endpoint);
+  for (const [k, v] of Object.entries({
+    response_type: 'code', client_id: clientId, redirect_uri: redirectUri, state, scope: SCOPES, resource,
+    code_challenge: b64url(crypto.createHash('sha256').update(verifier).digest()), code_challenge_method: 'S256',
+  })) authorize.searchParams.set(k, v);
+  const codePromise = waitForCode(state);
+  log(`SIGN-IN URL: ${authorize}`);
+  log('Waiting for sign-in...');
+  const code = await codePromise;
+  const accessToken = await exchange(as, clientId, code, verifier, resource);
+  log('Signed in.');
+
+  try {
+    const mcp = mcpClient(accessToken);
+    const init = await mcp.request('initialize', {
+      protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'security-passport-smoke', version: '1.0.0' },
+    });
+    log(`Connected to ${init.serverInfo?.name || 'server'} ${init.serverInfo?.version || ''} (protocol ${init.protocolVersion}).`);
+    await mcp.notify('notifications/initialized');
+
+    const { tools = [] } = await mcp.request('tools/list', {});
+    log(`\nTools (${tools.length}):`);
+    for (const t of tools) log(`- ${t.name}: ${(t.description || '').slice(0, 120)}`);
+    const tool = (suffix) => tools.find((t) => t.name === suffix || t.name.endsWith(suffix) || t.name.includes(suffix))?.name;
+
+    const get = tool('get-security-passport');
+    if (get) log(`\n== ${get} ${issueKey}\n${textOf(await mcp.request('tools/call', { name: get, arguments: { issueKey } }))}`);
+    const list = tool('list-open-security-checks');
+    if (list) log(`\n== ${list} ${projectKey}\n${textOf(await mcp.request('tools/call', { name: list, arguments: { projectKey } }))}`);
+    const rec = tool('record-security-evidence');
+    if (rec && record) {
+      const [checkId, evidence] = record;
+      log(`\n== ${rec} ${issueKey} ${checkId}\n${textOf(await mcp.request('tools/call', { name: rec, arguments: { issueKey, checkId, evidence } }))}`);
+    }
+  } finally {
+    if (as.revocation_endpoint) {
+      await fetch(as.revocation_endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token: accessToken, client_id: clientId }),
+      }).then((r) => log(`\nToken revoked (${r.status}).`), () => log('\nToken revocation failed.'));
+    }
+  }
+}
+
+main().catch((error) => {
+  console.error(`FAILED: ${error.message}`);
+  process.exit(1);
+});
