@@ -25,12 +25,15 @@ function summarize(checks) {
   return { status, total, openCount, doneCount: total - openCount };
 }
 
-// Combine a fresh analysis with the stored passport. Checks are never dropped:
-// if an area stops matching (for example after the description was edited),
-// its checks stay and are flagged "stale", so editing words cannot clear a gate.
+// Combine a fresh analysis with the stored passport. A check the analysis no
+// longer asks for (for example after the description was edited) stays and is
+// flagged "stale", so editing words cannot clear a gate. The exception is a
+// rules upgrade: open checks the new rules no longer ask for came from our old
+// rules, not from the ticket, so they are dropped. Closed checks keep their
+// evidence either way.
 export function mergePassport(existing, analysis, { now = new Date().toISOString() } = {}) {
   const previous = new Map((existing?.checks || []).map((c) => [c.id, c]));
-  const detectedIds = new Set(analysis.areas.map((a) => a.id));
+  const rulesChanged = Boolean(existing) && existing.rulesVersion !== RULES_VERSION;
   const checks = [];
 
   for (const area of analysis.areas) {
@@ -43,10 +46,15 @@ export function mergePassport(existing, analysis, { now = new Date().toISOString
     }
   }
   for (const prev of previous.values()) {
-    checks.push({ ...prev, stale: !detectedIds.has(prev.area) });
+    if (rulesChanged && prev.status === 'open') continue;
+    checks.push({ ...prev, stale: true });
   }
 
-  const detected = new Map((existing?.detected || []).map((d) => [d.id, { ...d, stale: true }]));
+  // Areas found now, plus earlier areas that still have checks in the passport.
+  const areasWithChecks = new Set(checks.map((c) => c.area));
+  const detected = new Map((existing?.detected || [])
+    .filter((d) => areasWithChecks.has(d.id))
+    .map((d) => [d.id, { ...d, stale: true }]));
   for (const area of analysis.areas) detected.set(area.id, { ...area, stale: false });
 
   const next = {
@@ -99,7 +107,8 @@ export function passportToText(issueKey, passport) {
   }
   for (const c of passport.checks) {
     const state = c.status === 'open' ? 'OPEN' : c.status === 'done' ? `DONE (evidence: ${c.note})` : `ACCEPTED RISK (${c.note})`;
-    lines.push(`- ${c.id}${c.cwe ? ` [${c.cwe}]` : ''} ${state}: ${c.title} How to verify: ${c.verify}`);
+    const stale = c.stale ? ' (no longer in the ticket text, still required)' : '';
+    lines.push(`- ${c.id}${c.cwe ? ` [${c.cwe}]` : ''} ${state}${stale}: ${c.title} How to verify: ${c.verify}`);
   }
   return lines.join('\n');
 }

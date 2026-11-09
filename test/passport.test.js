@@ -47,6 +47,44 @@ test('removing the wording does not clear the gate', () => {
   assert.ok(edited.checks.every((c) => c.stale === true));
 });
 
+test('a check the wording no longer asks for is stale even when its area still matches', () => {
+  const first = build('Let shoppers redeem coupon codes at checkout');
+  assert.ok(first.checks.some((c) => c.id === 'PAY-3'));
+  const edited = mergePassport(first, analyzeIssue({ summary: 'Let shoppers pay at checkout' }), { now: T1 });
+  const pay3 = edited.checks.find((c) => c.id === 'PAY-3');
+  assert.equal(pay3.status, 'open', 'the gate stays closed');
+  assert.equal(pay3.stale, true);
+  assert.equal(edited.checks.find((c) => c.id === 'PAY-1').stale, undefined);
+});
+
+test('a rules upgrade drops open checks the new rules no longer ask for, and keeps closed ones', () => {
+  const current = build('Send webhooks to the customer URL');
+  const crypto = { area: 'crypto', cwe: 'CWE-327', title: 'old rule', verify: 'old test', by: null, at: null };
+  const old = {
+    ...current,
+    rulesVersion: 1,
+    detected: [...current.detected, { id: 'crypto', label: 'Cryptography', matches: ['signature'] }],
+    areas: [...current.areas, 'crypto'],
+    checks: [
+      ...current.checks,
+      { ...crypto, id: 'CRYPTO-1', status: 'open', note: null },
+      { ...crypto, id: 'CRYPTO-2', status: 'done', note: 'bcrypt cost test', by: 'acc-1', at: T0 },
+    ],
+  };
+  const upgraded = mergePassport(old, analyzeIssue({ summary: 'Send webhooks to the customer URL' }), { now: T1 });
+  assert.ok(!upgraded.checks.some((c) => c.id === 'CRYPTO-1'), 'untouched false positive is dropped');
+  const kept = upgraded.checks.find((c) => c.id === 'CRYPTO-2');
+  assert.equal(kept.note, 'bcrypt cost test', 'closed checks keep their evidence');
+  assert.equal(kept.stale, true);
+  assert.equal(upgraded.rulesVersion, current.rulesVersion);
+
+  // Same upgrade with no closed crypto check: the crypto area disappears.
+  const bare = { ...old, checks: old.checks.filter((c) => c.id !== 'CRYPTO-2') };
+  const clean = mergePassport(bare, analyzeIssue({ summary: 'Send webhooks to the customer URL' }), { now: T1 });
+  assert.deepEqual(clean.areas, ['ssrf']);
+  assert.equal(clean.total, current.total);
+});
+
 test('done needs evidence and accepted needs a justification', () => {
   const p = build('Send webhooks to the customer URL');
   assert.throws(() => setCheckStatus(p, 'SSRF-1', { status: 'done', note: '' }), /evidence/);
