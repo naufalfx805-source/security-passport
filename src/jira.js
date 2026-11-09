@@ -1,7 +1,7 @@
 // Jira REST helpers. Reads and writes use asUser() whenever a person or agent
 // triggered them, so Jira's own permissions decide what they may see and change.
 
-import api, { route } from '@forge/api';
+import { asApp, asUser, route } from '@forge/api';
 import { PROPERTY_KEY } from './engine/passport.js';
 
 const ISSUE_KEY = /^[A-Z][A-Z0-9_]+-\d+$/;
@@ -18,7 +18,7 @@ export function normalizeProjectKey(value) {
 }
 
 function client(as) {
-  return as === 'user' ? api.asUser() : api.asApp();
+  return as === 'user' ? asUser() : asApp();
 }
 
 export async function getIssueFields(issueKey, as) {

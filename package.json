@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "description": "Forge app for Jira: security checks that travel with the ticket, from Jira to the pull request to your AI coding agent.",
-  "type": "module",
   "license": "MIT",
   "scripts": {
     "test": "node --test",

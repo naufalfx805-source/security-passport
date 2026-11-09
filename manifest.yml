@@ -16,9 +16,12 @@ modules:
   jira:workflowValidator:
     - key: security-passport-validator
       name: Security Passport complete
-      description: Blocks the transition while the issue's Security Passport still has open checks.
-      expression: "issue.properties['security-passport'] == null || issue.properties['security-passport'].status != 'open'"
-      errorMessage: This issue still has open Security Passport checks. Close them, or record an accepted risk, in the Security Passport panel.
+      description: Blocks the transition while the issue's Security Passport still has
+        open checks.
+      expression: "issue.properties['security-passport'] == null ||
+        issue.properties['security-passport'].status != 'open'"
+      errorMessage: This issue still has open Security Passport checks. Close them, or
+        record an accepted risk, in the Security Passport panel.
   jira:entityProperty:
     - key: security-passport-index
       entityType: issue
@@ -38,7 +41,8 @@ modules:
       name: Get security passport
       function: get-passport-action
       actionVerb: GET
-      description: Returns the security checks a Jira issue needs, why each matters, how to verify it, and its status.
+      description: Returns the security checks a Jira issue needs, why each matters,
+        how to verify it, and its status.
       inputs:
         issueKey:
           title: Issue key
@@ -49,7 +53,8 @@ modules:
       name: List open security checks
       function: list-open-action
       actionVerb: GET
-      description: Lists issues whose Security Passport still has open checks, optionally in one project.
+      description: Lists issues whose Security Passport still has open checks,
+        optionally in one project.
       inputs:
         projectKey:
           title: Project key
@@ -60,7 +65,8 @@ modules:
       name: Record security evidence
       function: record-evidence-action
       actionVerb: UPDATE
-      description: Marks one Security Passport check as done and stores the evidence, such as a test name or pull request link.
+      description: Marks one Security Passport check as done and stores the evidence,
+        such as a test name or pull request link.
       inputs:
         issueKey:
           title: Issue key
@@ -76,11 +82,13 @@ modules:
           title: Evidence
           type: string
           required: true
-          description: What proves the check is covered, such as a test name, pull request link or review note.
+          description: What proves the check is covered, such as a test name, pull request
+            link or review note.
   rovo:agent:
     - key: security-passport-agent
       name: Security Passport
-      description: Explains which security checks a ticket needs and records evidence when a check is covered.
+      description: Explains which security checks a ticket needs and records evidence
+        when a check is covered.
       prompt: |
         You are Security Passport, a security reviewer that lives in Jira.
         A Security Passport is the list of security checks a Jira issue needs because of what the work touches,
@@ -126,7 +134,7 @@ resources:
   - key: panel-ui
     path: src/frontend/index.jsx
 app:
-  id: ari:cloud:ecosystem::app/00000000-0000-0000-0000-000000000000
+  id: ari:cloud:ecosystem::app/73ed7a14-59de-41d1-8c1a-16b679c5860e
   runtime:
     name: nodejs22.x
 permissions:
