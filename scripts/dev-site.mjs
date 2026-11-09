@@ -95,6 +95,22 @@ const commands = {
     }
   },
 
+  // Try to move an issue to Done; the Security Passport validator may refuse.
+  async done(issueKey) {
+    const { transitions } = await jira(`/rest/api/3/issue/${issueKey}/transitions`);
+    const toDone = transitions.find((t) => t.to?.name === 'Done' || t.name === 'Done');
+    if (!toDone) { console.log(`${issueKey}: no transition to Done`); return; }
+    try {
+      await jira(`/rest/api/3/issue/${issueKey}/transitions`, {
+        method: 'POST',
+        body: JSON.stringify({ transition: { id: toDone.id } }),
+      });
+      console.log(`${issueKey}: moved to Done`);
+    } catch (error) {
+      console.log(`${issueKey}: refused -> ${error.message.replace(/^.*?-> /, '')}`);
+    }
+  },
+
   async passport(issueKey) {
     let property;
     try {
